@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Bano Qabil AI Service Desk">
+  <rect width="64" height="64" rx="16" fill="#071a35"/>
+  <circle cx="32" cy="27" r="15" fill="#14b86b"/>
+  <path d="M19 27c2-9 9-15 18-15 4 0 7 1 10 3-4-7-11-11-19-11C16 4 7 13 7 25c0 10 6 19 15 23-3-5-5-12-3-21Z" fill="#ffffff"/>
+  <circle cx="32" cy="27" r="7" fill="#071a35"/>
+  <path d="M22 48h20" stroke="#4aa3ff" stroke-width="5" stroke-linecap="round"/>
+</svg>
