@@ -3,9 +3,8 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 /**
- * The browser talks only to this route. Keeping the n8n URL server-side prevents
- * the production webhook address from being bundled into client-side JavaScript.
- * Vercel injects N8N_WEBHOOK_URL at runtime from Project Environment Variables.
+ * The browser talks only to this route.
+ * The n8n production webhook remains server-side in Vercel.
  */
 export async function POST(request: Request) {
   const webhookUrl = process.env.N8N_WEBHOOK_URL;
@@ -26,15 +25,16 @@ export async function POST(request: Request) {
   }
 
   if (!payload || typeof payload !== "object") {
-    return NextResponse.json({ error: "Request body must be a JSON object." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Request body must be a JSON object." },
+      { status: 400 },
+    );
   }
 
   try {
     const upstreamResponse = await fetch(webhookUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       cache: "no-store",
     });
@@ -53,18 +53,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // n8n can be configured to return JSON or plain text. This adapter accepts
-    // both so the frontend stays stable if the Respond to Webhook format changes.
     if (contentType.includes("application/json")) {
       try {
         const data: unknown = JSON.parse(rawBody);
         return NextResponse.json({ response: extractResponseText(data) });
       } catch {
-        // Fall through to the plain-text response path.
+        // Fall through to plain-text response handling.
       }
     }
 
-    return NextResponse.json({ response: rawBody || "The service returned an empty response." });
+    return NextResponse.json({
+      response: rawBody || "The service returned an empty response.",
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown network error";
 
@@ -92,7 +92,11 @@ function extractResponseText(value: unknown): string {
 
     for (const key of preferredKeys) {
       const candidate = record[key];
-      if (typeof candidate === "string" && candidate.trim()) return candidate;
+
+      if (typeof candidate === "string" && candidate.trim()) {
+        return candidate;
+      }
+
       if (candidate && typeof candidate === "object") {
         const nested = extractResponseText(candidate);
         if (nested) return nested;
