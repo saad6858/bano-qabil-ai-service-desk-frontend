@@ -3,8 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Bano Qabil AI Service Desk",
-  description:
-    "AI-powered Bano Qabil service desk for courses, curriculum, schedules, registration and application support.",
+  description: "Bano Qabil AI Service Desk",
   icons: {
     icon: "/favicon.svg",
   },
