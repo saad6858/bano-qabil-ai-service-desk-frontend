@@ -3,15 +3,16 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 /**
- * The browser talks only to this route.
- * The n8n production webhook remains server-side in Vercel.
+ * Browser -> this server route -> n8n.
+ * Keeping the n8n URL server-side prevents the production webhook URL
+ * from being exposed in the browser bundle.
  */
 export async function POST(request: Request) {
   const webhookUrl = process.env.N8N_WEBHOOK_URL;
 
   if (!webhookUrl) {
     return NextResponse.json(
-      { error: "The AI service is not configured yet. Set N8N_WEBHOOK_URL in Vercel." },
+      { error: "The AI service is not configured yet." },
       { status: 500 },
     );
   }
@@ -21,34 +22,28 @@ export async function POST(request: Request) {
   try {
     payload = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON request." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
   if (!payload || typeof payload !== "object") {
-    return NextResponse.json(
-      { error: "Request body must be a JSON object." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
   try {
-    const upstreamResponse = await fetch(webhookUrl, {
+    const upstream = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       cache: "no-store",
     });
 
-    const contentType = upstreamResponse.headers.get("content-type") ?? "";
-    const rawBody = await upstreamResponse.text();
+    const rawBody = await upstream.text();
+    const contentType = upstream.headers.get("content-type") ?? "";
 
-    if (!upstreamResponse.ok) {
+    if (!upstream.ok) {
+      // Do not expose raw n8n errors, execution traces, or upstream details to the user.
       return NextResponse.json(
-        {
-          error: "The AI service returned an error.",
-          upstreamStatus: upstreamResponse.status,
-          details: rawBody.slice(0, 1000),
-        },
+        { error: "The AI service returned an error." },
         { status: 502 },
       );
     }
@@ -58,18 +53,16 @@ export async function POST(request: Request) {
         const data: unknown = JSON.parse(rawBody);
         return NextResponse.json({ response: extractResponseText(data) });
       } catch {
-        // Fall through to plain-text response handling.
+        // The upstream declared JSON but returned invalid JSON; use the raw text below.
       }
     }
 
     return NextResponse.json({
-      response: rawBody || "The service returned an empty response.",
+      response: rawBody.trim() || "The service returned an empty response.",
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown network error";
-
+  } catch {
     return NextResponse.json(
-      { error: "Unable to reach the AI service.", details: message },
+      { error: "Unable to reach the AI service." },
       { status: 502 },
     );
   }
@@ -80,8 +73,8 @@ function extractResponseText(value: unknown): string {
 
   if (Array.isArray(value)) {
     for (const item of value) {
-      const extracted = extractResponseText(item);
-      if (extracted) return extracted;
+      const result = extractResponseText(item);
+      if (result.trim()) return result;
     }
     return "";
   }
@@ -92,17 +85,13 @@ function extractResponseText(value: unknown): string {
 
     for (const key of preferredKeys) {
       const candidate = record[key];
-
-      if (typeof candidate === "string" && candidate.trim()) {
-        return candidate;
-      }
-
+      if (typeof candidate === "string" && candidate.trim()) return candidate;
       if (candidate && typeof candidate === "object") {
         const nested = extractResponseText(candidate);
-        if (nested) return nested;
+        if (nested.trim()) return nested;
       }
     }
   }
 
-  return JSON.stringify(value, null, 2);
+  return "";
 }
